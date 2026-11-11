@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6fa3">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sourdough Tracker</title>
+<style>
+:root{--bg:#eef3f9;--card:#fff;--ink:#1d2b3a;--mute:#5d6e80;--line:#dbe3ec;--acc:#2f6fa3;--accbg:#d9e9f7;--ok:#dcefe4;--warn:#fdf0bd;--green:#25634a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a23;--card:#1b2530;--ink:#e8eef5;--mute:#93a3b5;--line:#2c3947;--acc:#7db6e8;--accbg:#264662;--ok:#1f3a2d;--warn:#4a3f17;--green:#7fd1ad}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:18px 14px 40px}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);font-weight:700}
+h1{margin:4px 0 2px;font-size:32px}h2{margin:0 0 12px;font-size:19px}
+.sub{color:var(--mute);font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
+.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);font-weight:700;margin:12px 0 6px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{flex:1;min-width:44px;padding:11px 6px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit;text-align:center;cursor:pointer}
+.chip.on{background:var(--accbg);border-color:var(--acc);font-weight:700;color:var(--acc)}
+.note{font-size:13px;color:var(--mute);margin-top:6px}
+.ing{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer}
+.ing .dot{width:22px;height:22px;border:2px solid var(--line);border-radius:50%;flex:none}
+.ing.done{opacity:.5}.ing.done .dot{background:var(--acc);border-color:var(--acc)}
+.ing b{margin-left:auto;font-size:26px}.ing small{color:var(--mute)}
+.levain{background:var(--ok);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.levain .big{font-size:20px;font-weight:700;color:var(--green)}
+.samp{background:var(--warn);border-radius:12px;padding:14px;margin-top:12px}
+.samp .big{font-size:56px;font-weight:800;line-height:1}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+.step{display:flex;gap:8px;align-items:center}.step input{text-align:center;flex:1;width:auto;min-width:0}.step button{flex:none;width:40px;min-width:0;padding:10px 0}
+.g2>div{min-width:0}input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;display:block;height:44px;line-height:1.2}
+.cols>div{min-width:0}
+@media (min-width:820px){main{max-width:1120px}.cols{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}}
+.tl{margin:10px 0 0;padding:0;list-style:none}
+.tl li{position:relative;display:flex;gap:10px;padding:6px 0 14px}
+.tl li::before{content:'';position:absolute;left:89px;top:16px;bottom:-16px;width:2px;background:var(--line)}
+.tl li:last-child::before{display:none}
+.tl li>div:last-child{flex:1;min-width:0}
+.tl .dot{flex:none;position:relative;z-index:1;width:12px;height:12px;border-radius:50%;margin-top:4px;box-sizing:border-box}
+.tl .k0{background:var(--acc)}.tl .k1{background:var(--card);border:2px solid var(--acc)}.tl .k2{background:var(--green)}
+.tl .t{width:74px;flex:none;font-size:13px;font-weight:600;text-align:right}
+.tl .t i{display:block;font-style:normal;font-size:10px;color:var(--mute)}
+.tl b{display:block}.tl span{font-size:13px;color:var(--mute)}
+.kv{display:grid;grid-template-columns:80px 1fr;gap:8px 10px;font-size:14px}.kv dt{font-weight:700}.kv dd{margin:0}
+.btn{padding:12px 16px;border:0;border-radius:10px;background:var(--acc);color:#fff;font:inherit;font-weight:700;cursor:pointer;width:100%;margin-top:10px}
+.btn.s{background:none;color:var(--acc);width:auto;padding:4px 0;margin:0;font-size:13px}
+.loaf{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.loaf .h{display:flex;justify-content:space-between;font-weight:700}
+.stars{color:#e0a100;letter-spacing:2px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow" id="eyebrow"></div>
+<h1>Sourdough Tracker</h1>
+<div class="sub">Weights in grams, temperatures in °F.</div>
+<div class="note" id="sync"></div>
+<div id="app"></div>
+</main>
+<script>
+var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+var S={hyd:75,batch:2,auto:60,bake:'dutch',day:2,mix:'13:00',fridge:16,temp:77,fpl:475,ww:10,lev:20,salt:2,ticks:{},rating:4,notes:''};
+var LOG=[];
+try{var raw=localStorage.getItem('bakeboard-log');if(raw)LOG=JSON.parse(raw)||[]}catch(e){}
+try{var st=localStorage.getItem('bakeboard-set');if(st){var o=JSON.parse(st);for(var k in o)if(k!=='ticks'&&k!=='notes')S[k]=o[k]}}catch(e){}
+var DEL=[],STS=0,CFG={};
+try{DEL=JSON.parse(localStorage.getItem('bb-del')||'[]');STS=+localStorage.getItem('bb-sts')||0;CFG=JSON.parse(localStorage.getItem('bb-gh')||'{}')}catch(e){}
+function curSet(){var c={};for(var k in S)if(k!=='ticks'&&k!=='notes')c[k]=S[k];return c}
+function persist(){try{localStorage.setItem('bb-sts',STS);localStorage.setItem('bb-del',JSON.stringify(DEL));localStorage.setItem('bakeboard-log',JSON.stringify(LOG));localStorage.setItem('bakeboard-set',JSON.stringify(curSet()))}catch(e){}}
+function save(){STS=Date.now();persist();sched()}
+function $(id){return document.getElementById(id)}
+var P=null,syncing=false,stimer=null;
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function gh(path,o){o=o||{};o.headers=Object.assign({Authorization:'Bearer '+CFG.token,Accept:'application/vnd.github+json'},o.headers||{});return fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,o)}
+function b64(t){return btoa(unescape(encodeURIComponent(t)))}
+function unb64(t){return decodeURIComponent(escape(atob(t.replace(/\n/g,''))))}
+function msg(t){var e=$('sync');if(e)e.textContent=t}
+function sched(){clearTimeout(stimer);if(CFG.token)stimer=setTimeout(sync,1500)}
+async function sync(){
+ if(!CFG.token||syncing)return;syncing=true;msg('Syncing…');
+ try{
+  for(var tries=0;tries<3;tries++){
+   var r=await gh('data.json',{cache:'no-store'}),sha=null,rem={log:[],del:[],set:null,sts:0};
+   if(r.status===200){var j=await r.json();sha=j.sha;rem=JSON.parse(unb64(j.content))}
+   else if(r.status===401||r.status===403)throw new Error('Token not allowed. Check its permissions.');
+   else if(r.status!==404)throw new Error('GitHub error '+r.status);
+   var dels={};(rem.del||[]).concat(DEL).forEach(function(i){dels[i]=1});
+   var m={};(rem.log||[]).concat(LOG).forEach(function(l){if(!dels[l.id])m[l.id]=l});
+   var log=Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.ts-a.ts});
+   var useRem=!!rem.set&&(rem.sts||0)>STS,set=useRem?rem.set:curSet(),sts=useRem?rem.sts:STS;
+   var out={log:log,del:Object.keys(dels).map(Number),set:set,sts:sts};
+   var changed=JSON.stringify(out)!==JSON.stringify({log:rem.log||[],del:rem.del||[],set:rem.set,sts:rem.sts||0});
+   LOG=log;DEL=out.del;if(useRem){for(var k in set)S[k]=set[k];STS=sts}
+   persist();
+   if(changed){
+    var pr=await gh('data.json',{method:'PUT',body:JSON.stringify({message:'sync',content:b64(JSON.stringify(out)),sha:sha||undefined})});
+    if(pr.status===409||pr.status===422){if(tries<2)continue;throw new Error('Conflict, try again')}
+    if(pr.status===404)throw new Error('Repo not found. Check username, repo name and token.');
+    if(pr.status===401||pr.status===403)throw new Error('Token not allowed. Check its permissions.');
+    if(!pr.ok)throw new Error('GitHub error '+pr.status)}
+   break}
+  msg('Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
+  var a=document.activeElement;if(!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')))render();
+ }catch(e){msg((navigator.onLine?'':'Offline. ')+'Sync problem: '+e.message)}
+ syncing=false}
+function upPhoto(f){if(!f||!CFG.token)return;var ta=$('notes');if(ta)S.notes=ta.value;var pst=$('pst');if(pst)pst.textContent='Uploading…';
+ var im=new Image(),u=URL.createObjectURL(f);
+ im.onload=function(){var r=Math.min(1,1000/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+  var url=c.toDataURL('image/jpeg',.7),id=String(Date.now());
+  gh('photos/'+id+'.jpg',{method:'PUT',body:JSON.stringify({message:'photo',content:url.split(',')[1]})}).then(function(r){if(!r.ok)throw 0;P={id:id,url:url};try{fetch(url).then(function(x){return x.blob()}).then(function(bl){return caches.open('bb-ph').then(function(ch){return ch.put('ph-'+id,new Response(bl))})})}catch(e){}render()}).catch(function(){var p=$('pst');if(p)p.textContent='Upload failed. Are you online?'})};
+ im.onerror=function(){var p=$('pst');if(p)p.textContent='Could not read that image'};im.src=u}
+async function getPhoto(id){var c=await caches.open('bb-ph'),k='ph-'+id,h=await c.match(k);if(!h){var r=await gh('photos/'+id+'.jpg',{headers:{Accept:'application/vnd.github.raw+json'}});if(!r.ok)throw 0;await c.put(k,r.clone());h=r}return URL.createObjectURL(await h.blob())}
+function loadPh(){document.querySelectorAll('img[data-ph]').forEach(function(im){if(im.getAttribute('src'))return;getPhoto(im.dataset.ph).then(function(u){im.src=u}).catch(function(){})})}
+function syncCard(){var c='<div class="card"><h2>Sync</h2>';
+ if(CFG.token)c+='<div class="note">Connected to <b>'+esc(CFG.owner)+'/'+esc(CFG.repo)+'</b>.</div><div class="g2"><button class="btn" data-sync="1">Sync now</button><button class="btn" style="background:var(--mute)" data-disc="1">Disconnect</button></div>';
+ else c+='<div class="note">Keeps your loaf log and settings in sync across devices using a private GitHub repo.</div><div class="lbl">GitHub username</div><input id="gu" autocapitalize="none" autocorrect="off"><div class="lbl">Data repo name</div><input id="gr" value="sourdough-data" autocapitalize="none" autocorrect="off"><div class="lbl">Access token</div><input id="gt" type="password" autocomplete="off"><button class="btn" data-conn="1">Connect and sync</button>';
+ return c+'</div>'}
+function init(){msg(CFG.token?'Syncing…':'Not connected. Scroll down to Sync to connect GitHub.');if(CFG.token)sync();
+ document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});window.addEventListener('online',sync);
+ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}
+function chips(arr,cur,key,fmt){return '<div class="row">'+arr.map(function(v){return '<button class="chip'+(v[0]===cur?' on':'')+'" data-k="'+key+'" data-v="'+v[0]+'">'+v[1]+'</button>'}).join('')+'</div>'}
+function fmtT(m,base){var d=Math.floor(m/1440),mm=((m%1440)+1440)%1440,h=Math.floor(mm/60),mi=mm%60,ap=h>=12?'PM':'AM';h=h%12||12;return {t:h+':'+(mi<10?'0':'')+mi+' '+ap,d:d!==base?DAYS[((d%7)+7)%7]:''}}
+var TT=[[65,16,100],[66,16,95],[67,15,90],[68,14,85],[69,13,80],[70,12,75],[71,11,70],[72,10,65],[73,9,60],[74,8,55],[75,7,50],[76,7,50],[77,6,40],[78,6,40],[79,5.5,30],[80,5.5,30]];
+function guide(t){var c=Math.max(65,Math.min(80,t)),i=Math.min(14,Math.floor(c)-65),f=c-65-i,a=TT[i],b=TT[i+1];return {h:a[1]+(b[1]-a[1])*f,r:Math.round(a[2]+(b[2]-a[2])*f),lo:t<=65}}
+function compute(){var n=S.batch,F=S.fpl*n,ww=Math.round(F*S.ww/100),bf=F-ww,w=Math.round(F*S.hyd/100),L=Math.round(F*S.lev/100),sl=Math.round(F*S.salt/100);var tot=F+w+L+sl;
+ var st=Math.round(L/9),fw=Math.round((L-st)/2);return {n:n,F:F,ww:ww,bf:bf,w:w,L:L,sl:sl,tot:tot,per:Math.round(tot/n),st:st,fw:fw}}
+function render(){
+ var c=compute(),h=S.mix.split(':'),mixM=(+h[0])*60+(+h[1]),g=guide(S.temp);
+ $('eyebrow').textContent='Yeasty Boys · '+(100-S.ww)+'/'+S.ww+' flour · '+S.lev+'% levain · '+S.salt+'% salt';
+ var ing=function(id,name,v){return '<div class="ing'+(S.ticks[id]?' done':'')+'" data-tick="'+id+'"><span class="dot"></span><span>'+name+'</span><b>'+v+' <small>g</small></b></div>'};
+ var pan=S.bake==='pans',bakeMin=pan?[25,25]:[25,25];
+ var A=S.auto,rimM=Math.round(g.h*60);
+ var ev=[];
+ if(A)ev.push([-A,'Autolyse','Flour and water only, mixed until no dry flour. Cover, '+A+' min at room temp.',0]);
+ ev.push([0,'Mix','Add levain and salt. Mix with spoon until combined, then fully incorporate with a wet hand for 1-2 minutes.',0]);
+ ev.push([30,'Stretch & fold #1','',0]);
+ ev.push([60,'Stretch & fold #2','',0]);ev.push([90,'Coil fold #1','',0]);ev.push([120,'Coil fold #2','Then hands off.',0]);
+ ev.push([rimM,'Shape at target rise (about '+g.r+'%)','Divide into '+c.n+' × '+c.per+' g, pre-shape, bench 20–30 min, final shape.',1]);
+ var fridgeAt=rimM+50;ev.push([fridgeAt,'Into the fridge',S.fridge+' h at 40°F. Bake straight from cold.',1]);
+ var loadAt=fridgeAt+S.fridge*60;
+ ev.push([loadAt-60,'Preheat 500°F, oven and '+(pan?'pans':'Dutch ovens'),'45–60 min before loading.',1]);
+ ev.push([loadAt,'Score cold and load','20 min covered, then 15–20 min uncovered, all at 450°F.',3]);
+ ev.push([loadAt+40,'Out of the oven','Unload right away. Cool on a wire rack.',2]);
+ ev.push([loadAt+130,'Slice','90 min of cooling beats 60.',2]);
+ var tl=ev.map(function(e){var f=fmtT(S.day*1440+mixM+e[0],S.day);return '<li><div class="t">'+(e[3]?'~':'')+f.t+(f.d?'<i>'+f.d.toUpperCase()+'</i>':'')+'</div><div><b>'+e[1]+'</b>'+(e[2]?'<span>'+e[2]+'</span>':'')+'</div></li>'}).join('').replace(/<li><div class="t">/g,function(m){return m});
+ var tlF=ev.map(function(e){var f=fmtT(S.day*1440+mixM+e[0],S.day);var ap=(e[3]===1||e[3]===2)?'~':'';var dk=e[3]===0?'k0':e[3]===1?'k1':'k2';return '<li><div class="t">'+ap+f.t+(f.d?'<i>'+f.d.toUpperCase()+'</i>':'')+'</div><em class="dot '+dk+'"></em><div><b>'+e[1]+'</b>'+(e[2]?'<span>'+e[2]+'</span>':'')+'</div></li>'}).join('');
+ var ld=fmtT(S.day*1440+mixM+loadAt,S.day);
+ var html='';
+ html+='<div class="card"><h2>What we’re baking</h2><div class="lbl">Hydration</div>'+chips([70,71,72,73,74,75,76,77,78,79,80].map(function(x){return [x,x+'%']}),S.hyd,'hyd')+'<div class="note">Water ÷ dry flour ('+S.fpl+' g per loaf). Levain and salt are not counted.</div>'
+  +'<div class="g2"><div><div class="lbl">Batch</div>'+chips([[1,'Single'],[2,'Double'],[3,'Triple']],S.batch,'batch')+'</div><div><div class="lbl">Autolyse</div>'+chips([[60,'1 h'],[30,'30 m'],[0,'Skip']],S.auto,'auto')+'</div></div>'
+  +'<div class="lbl">Baking in</div>'+chips([['dutch','Dutch ovens'],['pans','9×5 pans']],S.bake,'bake')
+  +'<div class="g2"><div><div class="lbl">Flour / loaf (g)</div><input type="number" inputmode="numeric" value="'+S.fpl+'" data-n="fpl"></div><div><div class="lbl">Whole wheat %</div><input type="number" inputmode="numeric" value="'+S.ww+'" data-n="ww"></div><div><div class="lbl">Levain %</div><input type="number" inputmode="numeric" value="'+S.lev+'" data-n="lev"></div><div><div class="lbl">Salt %</div><input type="number" step="0.5" inputmode="decimal" value="'+S.salt+'" data-n="salt"></div></div></div>';
+ var clockH='<div class="card"><h2>The clock</h2><div class="lbl">Mix day</div><div class="row">'+DAYS.map(function(d,i){return '<button class="chip'+(i===S.day?' on':'')+'" data-k="day" data-v="'+i+'">'+d+'</button>'}).join('')+'</div>'
+  +'<div class="g2"><div><div class="lbl">Levain + salt go in</div><input type="time" id="mixt" value="'+S.mix+'"></div><div><div class="lbl">Fridge hours</div><div class="step"><button class="chip" data-fr="-1">−</button><input type="number" inputmode="numeric" value="'+S.fridge+'" data-n="fridge"><button class="chip" data-fr="1">+</button></div></div></div>'
+  +'<div class="note">Loads at '+ld.t+(ld.d?' '+ld.d:'')+'. At 74–75% in a 40°F fridge, check for overproofing past 16 h.</div><ul class="tl">'+tlF+'</ul></div>';
+ html+='<div class="card"><h2>Weigh out <span class="sub" style="float:right;font-size:13px;font-weight:400">'+S.hyd+'% · '+(c.n===1?'single':c.n===2?'double':'triple')+'</span></h2><div class="lbl">Autolyse · flour and water only</div>'
+  +ing('bf','Bread flour',c.bf)+ing('ww','Whole wheat',c.ww)+ing('w','Water',c.w)+'<div class="lbl">Then add</div>'+ing('lv','Levain, peaked',c.L)+ing('sa','Kosher salt',c.sl)
+  +'<div class="note">Total dough <b>'+c.tot.toLocaleString()+' g</b> · '+c.n+' × '+c.per+' g <button class="btn s" style="float:right" data-clear="1">Clear ticks</button></div>'
+  +'<div class="levain"><div class="lbl" style="margin:0 0 6px;color:var(--green)">Night-before levain · 1:4:4 · 68°F · peaks in about 14 h</div><span class="big">'+c.st+'</span> g Yeasty Boys &nbsp; <span class="big">'+c.fw+'</span> g water &nbsp; <span class="big">'+c.fw+'</span> g flour &nbsp;= <b>'+(c.st+2*c.fw)+' g</b><div class="note">Mix it only once it is domed and floats.</div></div></div>';
+ var fm=fmtT(S.day*1440+mixM+rimM,S.day),hh=g.h%1?g.h.toFixed(1):g.h;
+ html+='<div class="card"><h2>Rise forecast</h2><div class="lbl">Dough temp (°F)</div><div class="step"><button class="chip" data-tp="-1">−</button><input type="number" inputmode="decimal" value="'+S.temp+'" data-n="temp"><button class="chip" data-tp="1">+</button></div>'
+  +'<div class="samp"><div class="big">'+hh+'<small style="font-size:24px"> h</small>'+(g.lo?'+':'')+'</div><p style="margin:8px 0 4px">Target rise <b>'+g.r+'%</b>'+(g.lo?'+':'')+'. Shape around <b>'+fm.t+(fm.d?' '+fm.d:'')+'</b>.</p><div class="note">Timing counts from when the starter goes in.</div></div>'
+  +'<div class="note">From The Sourdough Journey Dough Temping Guide (90/10 flour, 75% hydration, 2% salt, 20% starter). Timing is only a starting point, and strong starters can run faster. Watch the dough, not the clock.</div></div>';
+ html+=clockH;
+ html+='<div class="card"><h2>Bake sheet <span class="sub" style="float:right;font-size:13px;font-weight:400">'+(pan?'9×5 pans':'Dutch ovens')+'</span></h2><div class="row"><span class="chip on">500°F preheat</span><span class="chip on">450°F once loaded</span><span class="chip on">20 min covered</span><span class="chip on">15–20 min uncovered</span></div><dl class="kv" style="margin-top:12px">'
+  +'<dt>Shape</dt><dd>Pre-shape into rounds, seam down, bench 20–30 min uncovered. '+(pan?'Final shape as a sandwich loaf, seam down in a greased pan.':'Final shape as a batard in a 750 g banneton dusted with rice flour, seam up. Cover.')+'</dd>'
+  +'<dt>Preheat</dt><dd>500°F, oven and '+(pan?'pans':'Dutch ovens')+' together, 45–60 min.</dd><dt>Score</dt><dd>Straight from the fridge. One offset slash along the length, lame at 30–45°.</dd>'
+  +'<dt>Load</dt><dd>'+(pan?'Straight into the oven; the second pan goes on inverted as the lid. ':'Straight into the hot Dutch oven. ')+'Drop the oven to 450°F as you load.</dd><dt>Covered</dt><dd>20 min at 450°F.</dd>'
+  +'<dt>Uncovered</dt><dd>15–20 min at 450°F. Pull by crust color: deep amber-brown with dark ear edges. Swap the two ovens halfway through.</dd><dt>Inside</dt><dd>At or above 206°F is a floor, not the signal. At 74–75% it reads 210–211°F by lid-off.</dd><dt>Unload</dt><dd>Right away. Trapped steam softens the crust.</dd><dt>Cool</dt><dd>Wire rack, at least 1 h. 90 min preferred.</dd></dl></div>';
+ html+='<div class="card"><h2>Loaf log</h2><div class="note" style="margin:-6px 0 8px">Saves this bake’s settings with your notes, on this device.</div><div class="lbl">Rating</div>'+chips([[1,'1★'],[2,'2★'],[3,'3★'],[4,'4★'],[5,'5★']],S.rating,'rating')
+  +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')+'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+S.notes.replace(/</g,'&lt;')+'</textarea><button class="btn" data-log="1">Log this bake</button>'
+  +(LOG.length?LOG.map(function(l){var d=new Date(l.ts);return '<div class="loaf"><div class="h"><span>'+d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</span><span class="stars">'+'★'.repeat(l.rating)+'<span style="opacity:.3">'+'★'.repeat(5-l.rating)+'</span></span></div><div class="note">'+l.hyd+'% · '+l.n+' loaves · '+l.bake+' · '+l.auto+' min autolyse · '+l.fridge+' h fridge · dough '+l.temp+'°F</div>'+(l.photo?'<img data-ph="'+l.photo+'" alt="Crumb photo" style="width:100%;border-radius:10px;margin-top:8px">':'')+(l.notes?'<div style="margin-top:6px;font-size:14px">'+l.notes.replace(/</g,'&lt;')+'</div>':'')+'<button class="btn s" data-del="'+l.id+'">Delete</button></div>'}).join(''):'<div class="note" style="margin-top:12px">No loaves logged yet.</div>')+'</div>';
+ var P2=html.split('<div class="card">').slice(1).map(function(p){return '<div class="card">'+p}),L='',R='',G='';
+P2.forEach(function(p){if(/<h2>(The clock|Bake sheet)/.test(p))R+=p;else if(/<h2>Loaf log/.test(p))G+=p;else L+=p});
+$('app').innerHTML='<div class="cols"><div>'+L+'</div><div>'+R+'</div></div>'+G+syncCard();loadPh();
+}
+document.addEventListener('click',function(e){
+ var t=e.target.closest('[data-k],[data-tick],[data-clear],[data-fr],[data-tp],[data-log],[data-del],[data-sync],[data-conn],[data-disc]');if(!t)return;
+ var ta=$('notes');if(ta)S.notes=ta.value;
+ if(t.dataset.k){var k=t.dataset.k,v=t.dataset.v;S[k]=(k==='bake')?v:+v}
+ else if(t.dataset.tick){S.ticks[t.dataset.tick]=!S.ticks[t.dataset.tick]}
+ else if(t.dataset.clear){S.ticks={}}
+ else if(t.dataset.fr){S.fridge=Math.max(1,S.fridge+(+t.dataset.fr))}
+ else if(t.dataset.tp){S.temp=Math.max(60,Math.min(90,S.temp+(+t.dataset.tp)))}
+ else if(t.dataset.log){LOG.unshift({id:Date.now(),ts:Date.now(),hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:S.fridge,temp:S.temp,rating:S.rating,photo:P?P.id:'',notes:S.notes.trim()});S.notes='';P=null}
+ else if(t.dataset.del){DEL.push(+t.dataset.del);LOG=LOG.filter(function(l){return String(l.id)!==t.dataset.del})}
+ else if(t.dataset.sync){sync();return}
+ else if(t.dataset.conn){var u=$('gu').value.trim(),rp=$('gr').value.trim(),tk=$('gt').value.trim();if(!u||!rp||!tk){msg('Fill in all three boxes first.');return}CFG={owner:u,repo:rp,token:tk};try{localStorage.setItem('bb-gh',JSON.stringify(CFG))}catch(e){}render();sync();return}
+ else if(t.dataset.disc){CFG={};try{localStorage.removeItem('bb-gh')}catch(e){}msg('Disconnected. Your data stays on this device.');render();return}
+ save();render();
+});
+document.addEventListener('change',function(e){
+ var t=e.target;
+ if(t.id==='photo'){upPhoto(t.files&&t.files[0]);return}
+ if(t.id==='mixt'&&t.value){S.mix=t.value}
+ else if(t.dataset.n){var v=parseFloat(t.value);if(!isNaN(v)&&v>=0)S[t.dataset.n]=v}
+ else return;
+ var ta=$('notes');if(ta)S.notes=ta.value;
+ save();render();
+});
+render();init();
+</script>
+</body>
+</html>
