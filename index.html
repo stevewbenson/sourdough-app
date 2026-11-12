@@ -52,7 +52,8 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--card);borde
 .loaf{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
 .loaf .h{display:flex;justify-content:space-between;font-weight:700}
 .stars{color:#e0a100;letter-spacing:2px}
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.g3>div,.g2>div{min-width:0}
+.sec{font-weight:700;margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
 </style>
 </head>
 <body>
@@ -65,7 +66,7 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--card);borde
 </main>
 <script>
 var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-var S={hyd:75,batch:2,auto:60,bake:'dutch',day:2,mix:'13:00',fridge:16,temp:77,fpl:475,ww:10,lev:20,salt:2,ticks:{},rating:4,notes:''};
+var S={pre:500,cov:450,unc:450,hyd:75,batch:2,auto:60,bake:'dutch',day:2,mix:'13:00',fridge:16,temp:77,fpl:475,ww:10,lev:20,salt:2,ticks:{},rating:4,notes:''};
 var LOG=[];
 try{var raw=localStorage.getItem('bakeboard-log');if(raw)LOG=JSON.parse(raw)||[]}catch(e){}
 try{var st=localStorage.getItem('bakeboard-set');if(st){var o=JSON.parse(st);for(var k in o)if(k!=='ticks'&&k!=='notes')S[k]=o[k]}}catch(e){}
@@ -75,7 +76,33 @@ function curSet(){var c={};for(var k in S)if(k!=='ticks'&&k!=='notes')c[k]=S[k];
 function persist(){try{localStorage.setItem('bb-sts',STS);localStorage.setItem('bb-del',JSON.stringify(DEL));localStorage.setItem('bakeboard-log',JSON.stringify(LOG));localStorage.setItem('bakeboard-set',JSON.stringify(curSet()))}catch(e){}}
 function save(){STS=Date.now();persist();sched()}
 function $(id){return document.getElementById(id)}
-var P=null,syncing=false,stimer=null;
+var P=null,syncing=false,stimer=null,DRAFT={};
+function p2(n){return (n<10?'0':'')+n}
+function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function hm(m){m=((m%1440)+1440)%1440;return p2(Math.floor(m/60))+':'+p2(m%60)}
+function t12(x){var a=String(x).split(':'),h=+a[0],ap=h>=12?'PM':'AM';return (h%12||12)+':'+a[1]+' '+ap}
+function defs(){var c=compute(),g=guide(S.temp),h=S.mix.split(':'),mm=(+h[0])*60+(+h[1]);
+ return {date:today(),st:S.mix,sh:hm(mm+Math.round(g.h*60)),fr:S.fridge,rise:'',bf:c.bf,ww:c.ww,w:c.w,lv:c.L,sa:c.sl,dt:S.temp,rm:'',pre:S.pre,cov:S.cov,unc:S.unc,cm:20,um:15,it:''}}
+function logCard(){var D=defs();
+ function f(k,lb,ty,ph){ty=ty||'number';var v=DRAFT[k]!=null?DRAFT[k]:D[k];return '<div><div class="lbl">'+lb+'</div><input data-d="'+k+'" type="'+ty+'"'+(ty==='number'?' inputmode="decimal" step="any"':'')+' value="'+esc(v)+'" placeholder="'+(ph||'')+'"></div>'}
+ return '<div class="card"><h2>Loaf log</h2><div class="note" style="margin:-6px 0 8px">Pre-filled from your plan. Change anything to match what you actually did.</div>'
+ +'<div class="sec">When</div><div class="g2">'+f('date','Date you mixed','date')+f('st','Mixed at (levain + salt in)','time')+f('sh','Shaped at','time')+f('fr','Fridge hours')+'</div>'
+ +'<div class="sec">Ingredients actually used (g)</div><div class="g2">'+f('bf','Bread flour')+f('ww','Whole wheat')+f('w','Water')+f('lv','Levain')+f('sa','Salt')+'</div>'
+ +'<div class="sec">Temperatures (°F)</div><div class="g2">'+f('dt','Dough temp at mix')+f('rm','Room temp')+'</div>'
+ +'<div class="sec">Bake</div><div class="g2">'+f('pre','Preheat °F')+f('it','Internal temp °F')+f('cov','Covered °F')+f('cm','Covered minutes')+f('unc','Uncovered °F')+f('um','Uncovered minutes')+'</div>'
+ +'<div class="sec">How it went</div><div class="g2">'+f('rise','Perceived rise at shaping (%)','number','e.g. 40')+'</div><div class="lbl">Rating</div>'+chips([[1,'1★'],[2,'2★'],[3,'3★'],[4,'4★'],[5,'5★']],S.rating,'rating')
+ +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')
+ +'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+S.notes.replace(/</g,'&lt;')+'</textarea><button class="btn" data-log="1">Log this bake</button>'
+ +(LOG.length?LOG.map(loafHtml).join(''):'<div class="note" style="margin-top:12px">No loaves logged yet.</div>')+'</div>'}
+function loafHtml(l){var d=new Date(l.ts),q=function(a){return a.filter(Boolean).join(' · ')},has=function(x){return x!==''&&x!=null};
+ var ln=[q([l.hyd+'% hydration',l.n+' loaves',l.bake,l.auto+' min autolyse']),
+  q([l.st?'Mixed '+t12(l.st):'',l.sh?'shaped '+t12(l.sh):'',has(l.bulk)?'bulk '+l.bulk+' h':'',has(l.fridge)?'fridge '+l.fridge+' h':'',has(l.rise)?'perceived rise '+l.rise+'%':'']),
+  has(l.bf)?'Used (g): flour '+l.bf+', whole wheat '+l.ww+', water '+l.w+', levain '+l.lv+', salt '+l.sa:'',
+  q([has(l.temp)?'dough '+l.temp+'°F':'',has(l.rm)?'room '+l.rm+'°F':'']),
+  q([has(l.pre)?'preheat '+l.pre+'°F':'',has(l.cov)?'covered '+(has(l.cm)?l.cm:'?')+' min at '+l.cov+'°F':'',has(l.unc)?'uncovered '+(has(l.um)?l.um:'?')+' min at '+l.unc+'°F':'',has(l.it)?'internal '+l.it+'°F':''])];
+ return '<div class="loaf"><div class="h"><span>'+d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</span><span class="stars">'+'★'.repeat(l.rating)+'<span style="opacity:.3">'+'★'.repeat(5-l.rating)+'</span></span></div>'
+  +ln.filter(Boolean).map(function(x){return '<div class="note">'+esc(x)+'</div>'}).join('')
+  +(l.photo?'<img data-ph="'+l.photo+'" alt="Crumb photo" style="width:100%;border-radius:10px;margin-top:8px">':'')+(l.notes?'<div style="margin-top:6px;font-size:14px">'+esc(l.notes)+'</div>':'')+'<button class="btn s" data-del="'+l.id+'">Delete</button></div>'}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function gh(path,o){o=o||{};o.headers=Object.assign({Authorization:'Bearer '+CFG.token,Accept:'application/vnd.github+json'},o.headers||{});return fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,o)}
 function b64(t){return btoa(unescape(encodeURIComponent(t)))}
@@ -144,8 +171,8 @@ function render(){
  ev.push([rimM,'Shape at target rise (about '+g.r+'%)','Divide into '+c.n+' × '+c.per+' g, pre-shape, bench 20–30 min, final shape.',1]);
  var fridgeAt=rimM+50;ev.push([fridgeAt,'Into the fridge',S.fridge+' h at 40°F. Bake straight from cold.',1]);
  var loadAt=fridgeAt+S.fridge*60;
- ev.push([loadAt-60,'Preheat 500°F, oven and '+(pan?'pans':'Dutch ovens'),'45–60 min before loading.',1]);
- ev.push([loadAt,'Score cold and load','20 min covered, then 15–20 min uncovered, all at 450°F.',3]);
+ ev.push([loadAt-60,'Preheat '+S.pre+'°F, oven and '+(pan?'pans':'Dutch ovens'),'45–60 min before loading.',1]);
+ ev.push([loadAt,'Score cold and load','20 min covered at '+S.cov+'°F, then 15–20 min uncovered at '+S.unc+'°F.',3]);
  ev.push([loadAt+40,'Out of the oven','Unload right away. Cool on a wire rack.',2]);
  ev.push([loadAt+130,'Slice','90 min of cooling beats 60.',2]);
  var tl=ev.map(function(e){var f=fmtT(S.day*1440+mixM+e[0],S.day);return '<li><div class="t">'+(e[3]?'~':'')+f.t+(f.d?'<i>'+f.d.toUpperCase()+'</i>':'')+'</div><div><b>'+e[1]+'</b>'+(e[2]?'<span>'+e[2]+'</span>':'')+'</div></li>'}).join('').replace(/<li><div class="t">/g,function(m){return m});
@@ -168,14 +195,12 @@ function render(){
   +'<div class="samp"><div class="big">'+hh+'<small style="font-size:24px"> h</small>'+(g.lo?'+':'')+'</div><p style="margin:8px 0 4px">Target rise <b>'+g.r+'%</b>'+(g.lo?'+':'')+'. Shape around <b>'+fm.t+(fm.d?' '+fm.d:'')+'</b>.</p><div class="note">Timing counts from when the starter goes in.</div></div>'
   +'<div class="note">From The Sourdough Journey Dough Temping Guide (90/10 flour, 75% hydration, 2% salt, 20% starter). Timing is only a starting point, and strong starters can run faster. Watch the dough, not the clock.</div></div>';
  html+=clockH;
- html+='<div class="card"><h2>Bake sheet <span class="sub" style="float:right;font-size:13px;font-weight:400">'+(pan?'9×5 pans':'Dutch ovens')+'</span></h2><div class="row"><span class="chip on">500°F preheat</span><span class="chip on">450°F once loaded</span><span class="chip on">20 min covered</span><span class="chip on">15–20 min uncovered</span></div><dl class="kv" style="margin-top:12px">'
+ html+='<div class="card"><h2>Bake sheet <span class="sub" style="float:right;font-size:13px;font-weight:400">'+(pan?'9×5 pans':'Dutch ovens')+'</span></h2><div class="row"><span class="chip on">'+S.pre+'°F preheat</span><span class="chip on">'+S.cov+'°F covered</span><span class="chip on">'+S.unc+'°F uncovered</span><span class="chip on">20 min covered</span><span class="chip on">15–20 min uncovered</span></div><div class="lbl">Oven temps (°F)</div><div class="g3"><div><div class="note">Preheat</div><input type="number" inputmode="numeric" value="'+S.pre+'" data-n="pre"></div><div><div class="note">Covered</div><input type="number" inputmode="numeric" value="'+S.cov+'" data-n="cov"></div><div><div class="note">Uncovered</div><input type="number" inputmode="numeric" value="'+S.unc+'" data-n="unc"></div></div><dl class="kv" style="margin-top:12px">'
   +'<dt>Shape</dt><dd>Pre-shape into rounds, seam down, bench 20–30 min uncovered. '+(pan?'Final shape as a sandwich loaf, seam down in a greased pan.':'Final shape as a batard in a 750 g banneton dusted with rice flour, seam up. Cover.')+'</dd>'
-  +'<dt>Preheat</dt><dd>500°F, oven and '+(pan?'pans':'Dutch ovens')+' together, 45–60 min.</dd><dt>Score</dt><dd>Straight from the fridge. One offset slash along the length, lame at 30–45°.</dd>'
-  +'<dt>Load</dt><dd>'+(pan?'Straight into the oven; the second pan goes on inverted as the lid. ':'Straight into the hot Dutch oven. ')+'Drop the oven to 450°F as you load.</dd><dt>Covered</dt><dd>20 min at 450°F.</dd>'
-  +'<dt>Uncovered</dt><dd>15–20 min at 450°F. Pull by crust color: deep amber-brown with dark ear edges. Swap the two ovens halfway through.</dd><dt>Inside</dt><dd>At or above 206°F is a floor, not the signal. At 74–75% it reads 210–211°F by lid-off.</dd><dt>Unload</dt><dd>Right away. Trapped steam softens the crust.</dd><dt>Cool</dt><dd>Wire rack, at least 1 h. 90 min preferred.</dd></dl></div>';
- html+='<div class="card"><h2>Loaf log</h2><div class="note" style="margin:-6px 0 8px">Saves this bake’s settings with your notes, on this device.</div><div class="lbl">Rating</div>'+chips([[1,'1★'],[2,'2★'],[3,'3★'],[4,'4★'],[5,'5★']],S.rating,'rating')
-  +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')+'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+S.notes.replace(/</g,'&lt;')+'</textarea><button class="btn" data-log="1">Log this bake</button>'
-  +(LOG.length?LOG.map(function(l){var d=new Date(l.ts);return '<div class="loaf"><div class="h"><span>'+d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</span><span class="stars">'+'★'.repeat(l.rating)+'<span style="opacity:.3">'+'★'.repeat(5-l.rating)+'</span></span></div><div class="note">'+l.hyd+'% · '+l.n+' loaves · '+l.bake+' · '+l.auto+' min autolyse · '+l.fridge+' h fridge · dough '+l.temp+'°F</div>'+(l.photo?'<img data-ph="'+l.photo+'" alt="Crumb photo" style="width:100%;border-radius:10px;margin-top:8px">':'')+(l.notes?'<div style="margin-top:6px;font-size:14px">'+l.notes.replace(/</g,'&lt;')+'</div>':'')+'<button class="btn s" data-del="'+l.id+'">Delete</button></div>'}).join(''):'<div class="note" style="margin-top:12px">No loaves logged yet.</div>')+'</div>';
+  +'<dt>Preheat</dt><dd>'+S.pre+'°F, oven and '+(pan?'pans':'Dutch ovens')+' together, 45–60 min.</dd><dt>Score</dt><dd>Straight from the fridge. One offset slash along the length, lame at 30–45°.</dd>'
+  +'<dt>Load</dt><dd>'+(pan?'Straight into the oven; the second pan goes on inverted as the lid. ':'Straight into the hot Dutch oven. ')+'Drop the oven to '+S.cov+'°F as you load.</dd><dt>Covered</dt><dd>20 min at '+S.cov+'°F.</dd>'
+  +'<dt>Uncovered</dt><dd>'+(S.unc!==S.cov?'Take the lids off and set the oven to '+S.unc+'°F. ':'')+'15–20 min at '+S.unc+'°F. Pull by crust color: deep amber-brown with dark ear edges. Swap the two ovens halfway through.</dd><dt>Inside</dt><dd>At or above 206°F is a floor, not the signal. At 74–75% it reads 210–211°F by lid-off.</dd><dt>Unload</dt><dd>Right away. Trapped steam softens the crust.</dd><dt>Cool</dt><dd>Wire rack, at least 1 h. 90 min preferred.</dd></dl></div>';
+ html+=logCard();
  var P2=html.split('<div class="card">').slice(1).map(function(p){return '<div class="card">'+p}),L='',R='',G='';
 P2.forEach(function(p){if(/<h2>(The clock|Bake sheet)/.test(p))R+=p;else if(/<h2>Loaf log/.test(p))G+=p;else L+=p});
 $('app').innerHTML='<div class="cols"><div>'+L+'</div><div>'+R+'</div></div>'+G+syncCard();loadPh();
@@ -188,7 +213,10 @@ document.addEventListener('click',function(e){
  else if(t.dataset.clear){S.ticks={}}
  else if(t.dataset.fr){S.fridge=Math.max(1,S.fridge+(+t.dataset.fr))}
  else if(t.dataset.tp){S.temp=Math.max(60,Math.min(90,S.temp+(+t.dataset.tp)))}
- else if(t.dataset.log){LOG.unshift({id:Date.now(),ts:Date.now(),hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:S.fridge,temp:S.temp,rating:S.rating,photo:P?P.id:'',notes:S.notes.trim()});S.notes='';P=null}
+ else if(t.dataset.log){document.querySelectorAll('[data-d]').forEach(function(i){DRAFT[i.dataset.d]=i.value});var D=defs(),v=function(k){return DRAFT[k]!=null?DRAFT[k]:D[k]},n=function(k){var x=parseFloat(v(k));return isNaN(x)?'':x};
+ var st=v('st'),sh=v('sh'),bulk='';if(/^\d+:\d+$/.test(st)&&/^\d+:\d+$/.test(sh)){var a1=st.split(':'),b1=sh.split(':'),df=(+b1[0])*60+(+b1[1])-((+a1[0])*60+(+a1[1]));if(df<0)df+=1440;bulk=Math.round(df/6)/10}
+ var ts=new Date(v('date')+'T'+(st||'12:00')).getTime();if(isNaN(ts))ts=Date.now();
+ LOG.unshift({id:Date.now(),ts:ts,hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:n('fr'),temp:n('dt'),rm:n('rm'),st:st,sh:sh,bulk:bulk,rise:n('rise'),bf:n('bf'),ww:n('ww'),w:n('w'),lv:n('lv'),sa:n('sa'),pre:n('pre'),cov:n('cov'),cm:n('cm'),unc:n('unc'),um:n('um'),it:n('it'),rating:S.rating,photo:P?P.id:'',notes:S.notes.trim()});LOG.sort(function(a,b){return b.ts-a.ts});S.notes='';P=null;DRAFT={}}
  else if(t.dataset.del){DEL.push(+t.dataset.del);LOG=LOG.filter(function(l){return String(l.id)!==t.dataset.del})}
  else if(t.dataset.sync){sync();return}
  else if(t.dataset.conn){var u=$('gu').value.trim(),rp=$('gr').value.trim(),tk=$('gt').value.trim();if(!u||!rp||!tk){msg('Fill in all three boxes first.');return}CFG={owner:u,repo:rp,token:tk};try{localStorage.setItem('bb-gh',JSON.stringify(CFG))}catch(e){}render();sync();return}
@@ -197,6 +225,7 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('change',function(e){
  var t=e.target;
+ if(t.dataset.d){DRAFT[t.dataset.d]=t.value;return}
  if(t.id==='photo'){upPhoto(t.files&&t.files[0]);return}
  if(t.id==='mixt'&&t.value){S.mix=t.value}
  else if(t.dataset.n){var v=parseFloat(t.value);if(!isNaN(v)&&v>=0)S[t.dataset.n]=v}
