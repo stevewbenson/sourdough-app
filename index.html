@@ -66,20 +66,19 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--card);borde
 <div class="note" id="sync"></div>
 <div id="app"></div>
 </main>
-<script src="firebase-config.js"></script>
 <script>
 var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 var S={pre:500,cov:450,unc:450,hyd:75,batch:2,auto:60,bake:'dutch',day:2,mix:'13:00',fridge:16,temp:77,fpl:475,ww:10,lev:20,salt:2,ticks:{},rating:4,notes:''};
 var LOG=[];
 try{var raw=localStorage.getItem('bakeboard-log');if(raw)LOG=JSON.parse(raw)||[]}catch(e){}
 try{var st=localStorage.getItem('bakeboard-set');if(st){var o=JSON.parse(st);for(var k in o)if(k!=='ticks'&&k!=='notes')S[k]=o[k]}}catch(e){}
-var STS=0;
-try{STS=+localStorage.getItem('bb-sts')||0}catch(e){}
+var DEL=[],STS=0,CFG={};
+try{DEL=JSON.parse(localStorage.getItem('bb-del')||'[]');STS=+localStorage.getItem('bb-sts')||0;CFG=JSON.parse(localStorage.getItem('bb-gh')||'{}')}catch(e){}
 function curSet(){var c={};for(var k in S)if(k!=='ticks'&&k!=='notes')c[k]=S[k];return c}
-function persist(){try{localStorage.setItem('bb-sts',STS);localStorage.setItem('bakeboard-log',JSON.stringify(LOG.map(function(l){var c=Object.assign({},l);delete c.photo;return c})));localStorage.setItem('bakeboard-set',JSON.stringify(curSet()))}catch(e){}}
-function save(){STS=Date.now();persist();pushSet()}
+function persist(){try{localStorage.setItem('bb-sts',STS);localStorage.setItem('bb-del',JSON.stringify(DEL));localStorage.setItem('bakeboard-log',JSON.stringify(LOG));localStorage.setItem('bakeboard-set',JSON.stringify(curSet()))}catch(e){}}
+function save(){STS=Date.now();persist();sched()}
 function $(id){return document.getElementById(id)}
-var P=null,DRAFT={};
+var P=null,syncing=false,stimer=null,DRAFT={};
 function p2(n){return (n<10?'0':'')+n}
 function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
 function hm(m){m=((m%1440)+1440)%1440;return p2(Math.floor(m/60))+':'+p2(m%60)}
@@ -94,7 +93,7 @@ function logCard(){var D=defs();
  +'<div class="sec">Temperatures (°F)</div><div class="g2">'+f('dt','Dough temp at mix')+f('rm','Room temp')+'</div>'
  +'<div class="sec">Bake</div><div class="g2">'+f('pre','Preheat °F')+f('it','Internal temp °F')+f('cov','Covered °F')+f('cm','Covered minutes')+f('unc','Uncovered °F')+f('um','Uncovered minutes')+'</div>'
  +'<div class="sec">How it went</div><div class="g2">'+f('rise','Perceived rise at shaping (%)','number','e.g. 40')+'</div><div class="lbl">Rating</div>'+chips([[1,'1★'],[2,'2★'],[3,'3★'],[4,'4★'],[5,'5★']],S.rating,'rating')
- +(UID?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')
+ +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')
  +'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+S.notes.replace(/</g,'&lt;')+'</textarea><button class="btn" data-log="1">Log this bake</button>'
  +(LOG.length?LOG.map(loafHtml).join(''):'<div class="note" style="margin-top:12px">No loaves logged yet.</div>')+'</div>'}
 function loafHtml(l){var d=new Date(l.ts),q=function(a){return a.filter(Boolean).join(' · ')},has=function(x){return x!==''&&x!=null};
@@ -105,52 +104,54 @@ function loafHtml(l){var d=new Date(l.ts),q=function(a){return a.filter(Boolean)
   q([has(l.pre)?'preheat '+l.pre+'°F':'',has(l.cov)?'covered '+(has(l.cm)?l.cm:'?')+' min at '+l.cov+'°F':'',has(l.unc)?'uncovered '+(has(l.um)?l.um:'?')+' min at '+l.unc+'°F':'',has(l.it)?'internal '+l.it+'°F':''])];
  return '<div class="loaf"><div class="h"><span>'+d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})+'</span><span class="stars">'+'★'.repeat(l.rating)+'<span style="opacity:.3">'+'★'.repeat(5-l.rating)+'</span></span></div>'
   +ln.filter(Boolean).map(function(x){return '<div class="note">'+esc(x)+'</div>'}).join('')
-  +(/^data:image\//.test(l.photo||'')?'<img src="'+l.photo+'" alt="Crumb photo" style="width:100%;border-radius:10px;margin-top:8px">':'')+(l.notes?'<div style="margin-top:6px;font-size:14px">'+esc(l.notes)+'</div>':'')+'<button class="btn s" data-del="'+l.id+'">Delete</button></div>'}
+  +(l.photo?'<img data-ph="'+l.photo+'" alt="Crumb photo" style="width:100%;border-radius:10px;margin-top:8px">':'')+(l.notes?'<div style="margin-top:6px;font-size:14px">'+esc(l.notes)+'</div>':'')+'<button class="btn s" data-del="'+l.id+'">Delete</button></div>'}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-var UID=null,USER=null,FB=null,unL=null,unS=null,setT=null,OUT=false;
+function gh(path,o){o=o||{};o.headers=Object.assign({Authorization:'Bearer '+CFG.token,Accept:'application/vnd.github+json'},o.headers||{});return fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,o)}
+function b64(t){return btoa(unescape(encodeURIComponent(t)))}
+function unb64(t){return decodeURIComponent(escape(atob(t.replace(/\n/g,''))))}
 function msg(t){var e=$('sync');if(e)e.textContent=t}
-function jc(o){return JSON.parse(JSON.stringify(o))}
-function busy(){var a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')}
-function fbPut(l){if(!UID||!l)return;FB.F.setDoc(FB.F.doc(FB.db,'users',UID,'loaves',String(l.id)),jc(l)).catch(function(e){msg('Could not save to the cloud: '+e.code)})}
-function fbDel(id){if(!UID)return;FB.F.deleteDoc(FB.F.doc(FB.db,'users',UID,'loaves',String(id))).catch(function(){})}
-function pushSet(){clearTimeout(setT);if(!UID)return;setT=setTimeout(function(){FB.F.setDoc(FB.F.doc(FB.db,'users',UID,'meta','settings'),{set:jc(curSet()),sts:STS}).catch(function(){})},800)}
-function unlisten(){if(unL)unL();if(unS)unS();unL=unS=null}
-function listen(){var F=FB.F,db=FB.db,upKey='bb-up-'+UID;
- unL=F.onSnapshot(F.collection(db,'users',UID,'loaves'),function(s){
-  var arr=[];s.forEach(function(d){arr.push(d.data())});
-  if(!s.metadata.fromCache&&!localStorage.getItem(upKey)){var have={};arr.forEach(function(l){have[l.id]=1});
-   LOG.forEach(function(l){if(!have[l.id]){var c=Object.assign({},l);if(!/^data:image\//.test(c.photo||''))c.photo='';fbPut(c);arr.push(c)}});
-   try{localStorage.setItem(upKey,'1')}catch(e){}}
-  if(s.metadata.fromCache&&!arr.length&&LOG.length){msg('Loading your data…');return}
-  arr.sort(function(a,b){return b.ts-a.ts});LOG=arr;persist();
-  msg(s.metadata.fromCache?'Offline. Showing saved data.':'Synced · '+(USER.email||''));
-  if(!busy())render()},function(e){msg('Cloud problem: '+e.code)});
- unS=F.onSnapshot(F.doc(db,'users',UID,'meta','settings'),function(s){
-  var d=s.exists()?s.data():null;
-  if(!d){if(!s.metadata.fromCache){STS=STS||Date.now();persist();pushSet()}return}
-  if(!s.metadata.hasPendingWrites&&(d.sts||0)>STS){for(var k in d.set)S[k]=d.set[k];STS=d.sts;persist();if(!busy())render()}},function(){})}
-function signIn(){if(!FB)return;var Au=FB.Au;msg('Opening Google sign-in…');Au.signInWithPopup(FB.auth,new Au.GoogleAuthProvider()).catch(function(e){msg(e.code==='auth/popup-blocked'?'Your browser blocked the sign-in window. Allow pop-ups and try again.':e.code==='auth/popup-closed-by-user'?'Sign-in cancelled.':e.code==='auth/unauthorized-domain'?'This web address is not authorized in Firebase yet.':'Sign-in problem: '+e.code)})}
-function signOutU(){if(FB){OUT=true;FB.Au.signOut(FB.auth)}}
-async function fbInit(){var C=window.FB_CONFIG;
- if(!C||!C.apiKey||/PASTE/.test(C.apiKey)){msg('Cloud sync is not set up yet.');return}
- try{var B='https://www.gstatic.com/firebasejs/10.14.1/',m=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-auth.js'),import(B+'firebase-firestore.js')]),A=m[0],Au=m[1],F=m[2];
-  var app=A.initializeApp(C),db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})}),auth=Au.getAuth(app);
-  FB={Au:Au,F:F,db:db,auth:auth};
-  Au.onAuthStateChanged(auth,function(u){unlisten();USER=u;UID=u?u.uid:null;
-   if(u){msg('Signing in…');listen()}else{if(OUT){LOG=[];persist();OUT=false}msg('Not signed in. Scroll down to sign in with Google.')}
-   render()})
- }catch(e){msg('Could not load Google sign-in. You may be offline.')}}
-function upPhoto(f){if(!f||!UID)return;var ta=$('notes');if(ta)S.notes=ta.value;var pst=$('pst');if(pst)pst.textContent='Preparing…';
+function sched(){clearTimeout(stimer);if(CFG.token)stimer=setTimeout(sync,1500)}
+async function sync(){
+ if(!CFG.token||syncing)return;syncing=true;msg('Syncing…');
+ try{
+  for(var tries=0;tries<3;tries++){
+   var r=await gh('data.json',{cache:'no-store'}),sha=null,rem={log:[],del:[],set:null,sts:0};
+   if(r.status===200){var j=await r.json();sha=j.sha;rem=JSON.parse(unb64(j.content))}
+   else if(r.status===401||r.status===403)throw new Error('Token not allowed. Check its permissions.');
+   else if(r.status!==404)throw new Error('GitHub error '+r.status);
+   var dels={};(rem.del||[]).concat(DEL).forEach(function(i){dels[i]=1});
+   var m={};(rem.log||[]).concat(LOG).forEach(function(l){if(!dels[l.id])m[l.id]=l});
+   var log=Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.ts-a.ts});
+   var useRem=!!rem.set&&(rem.sts||0)>STS,set=useRem?rem.set:curSet(),sts=useRem?rem.sts:STS;
+   var out={log:log,del:Object.keys(dels).map(Number),set:set,sts:sts};
+   var changed=JSON.stringify(out)!==JSON.stringify({log:rem.log||[],del:rem.del||[],set:rem.set,sts:rem.sts||0});
+   LOG=log;DEL=out.del;if(useRem){for(var k in set)S[k]=set[k];STS=sts}
+   persist();
+   if(changed){
+    var pr=await gh('data.json',{method:'PUT',body:JSON.stringify({message:'sync',content:b64(JSON.stringify(out)),sha:sha||undefined})});
+    if(pr.status===409||pr.status===422){if(tries<2)continue;throw new Error('Conflict, try again')}
+    if(pr.status===404)throw new Error('Repo not found. Check username, repo name and token.');
+    if(pr.status===401||pr.status===403)throw new Error('Token not allowed. Check its permissions.');
+    if(!pr.ok)throw new Error('GitHub error '+pr.status)}
+   break}
+  msg('Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
+  var a=document.activeElement;if(!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')))render();
+ }catch(e){msg((navigator.onLine?'':'Offline. ')+'Sync problem: '+e.message)}
+ syncing=false}
+function upPhoto(f){if(!f||!CFG.token)return;var ta=$('notes');if(ta)S.notes=ta.value;var pst=$('pst');if(pst)pst.textContent='Uploading…';
  var im=new Image(),u=URL.createObjectURL(f);
- im.onload=function(){var r=Math.min(1,900/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);P={url:c.toDataURL('image/jpeg',.6)};render()};
+ im.onload=function(){var r=Math.min(1,1000/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+  var url=c.toDataURL('image/jpeg',.7),id=String(Date.now());
+  gh('photos/'+id+'.jpg',{method:'PUT',body:JSON.stringify({message:'photo',content:url.split(',')[1]})}).then(function(r){if(!r.ok)throw 0;P={id:id,url:url};try{fetch(url).then(function(x){return x.blob()}).then(function(bl){return caches.open('bb-ph').then(function(ch){return ch.put('ph-'+id,new Response(bl))})})}catch(e){}render()}).catch(function(){var p=$('pst');if(p)p.textContent='Upload failed. Are you online?'})};
  im.onerror=function(){var p=$('pst');if(p)p.textContent='Could not read that image'};im.src=u}
-function acctCard(){var c='<div class="card"><h2>Account</h2>';
- if(!(window.FB_CONFIG&&window.FB_CONFIG.apiKey)||/PASTE/.test(window.FB_CONFIG.apiKey))c+='<div class="note">Cloud sync is not set up yet.</div>';
- else if(!FB)c+='<div class="note">Loading sign-in…</div>';
- else if(UID)c+='<div class="note">Signed in as <b>'+esc(USER.email||USER.displayName||'')+'</b>. Your loaves and settings sync across your devices.</div><button class="btn" style="background:var(--mute)" data-gout="1">Sign out</button>';
- else c+='<div class="note">Sign in to save your loaves and settings and use them on any device.</div><button class="btn" data-gin="1">Sign in with Google</button>';
+async function getPhoto(id){var c=await caches.open('bb-ph'),k='ph-'+id,h=await c.match(k);if(!h){var r=await gh('photos/'+id+'.jpg',{headers:{Accept:'application/vnd.github.raw+json'}});if(!r.ok)throw 0;await c.put(k,r.clone());h=r}return URL.createObjectURL(await h.blob())}
+function loadPh(){document.querySelectorAll('img[data-ph]').forEach(function(im){if(im.getAttribute('src'))return;getPhoto(im.dataset.ph).then(function(u){im.src=u}).catch(function(){})})}
+function syncCard(){var c='<div class="card"><h2>Sync</h2>';
+ if(CFG.token)c+='<div class="note">Connected to <b>'+esc(CFG.owner)+'/'+esc(CFG.repo)+'</b>.</div><div class="g2"><button class="btn" data-sync="1">Sync now</button><button class="btn" style="background:var(--mute)" data-disc="1">Disconnect</button></div>';
+ else c+='<div class="note">Keeps your loaf log and settings in sync across devices using a private GitHub repo.</div><div class="lbl">GitHub username</div><input id="gu" autocapitalize="none" autocorrect="off"><div class="lbl">Data repo name</div><input id="gr" value="sourdough-data" autocapitalize="none" autocorrect="off"><div class="lbl">Access token</div><input id="gt" type="password" autocomplete="off"><button class="btn" data-conn="1">Connect and sync</button>';
  return c+'</div>'}
-function init(){msg('Loading…');fbInit();
+function init(){msg(CFG.token?'Syncing…':'Not connected. Scroll down to Sync to connect GitHub.');if(CFG.token)sync();
+ document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});window.addEventListener('online',sync);
  if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}
 function chips(arr,cur,key,fmt){return '<div class="row">'+arr.map(function(v){return '<button class="chip'+(v[0]===cur?' on':'')+'" data-k="'+key+'" data-v="'+v[0]+'">'+v[1]+'</button>'}).join('')+'</div>'}
 function fmtT(m,base){var d=Math.floor(m/1440),mm=((m%1440)+1440)%1440,h=Math.floor(mm/60),mi=mm%60,ap=h>=12?'PM':'AM';h=h%12||12;return {t:h+':'+(mi<10?'0':'')+mi+' '+ap,d:d!==base?DAYS[((d%7)+7)%7]:''}}
@@ -204,10 +205,10 @@ function render(){
  html+=logCard();
  var P2=html.split('<div class="card">').slice(1).map(function(p){return '<div class="card">'+p}),L='',R='',G='';
 P2.forEach(function(p){if(/<h2>(The clock|Bake sheet)/.test(p))R+=p;else if(/<h2>Loaf log/.test(p))G+=p;else L+=p});
-$('app').innerHTML='<div class="cols"><div>'+L+'</div><div>'+R+'</div></div>'+G+acctCard();
+$('app').innerHTML='<div class="cols"><div>'+L+'</div><div>'+R+'</div></div>'+G+syncCard();loadPh();
 }
 document.addEventListener('click',function(e){
- var t=e.target.closest('[data-k],[data-tick],[data-clear],[data-fr],[data-tp],[data-log],[data-del],[data-gin],[data-gout]');if(!t)return;
+ var t=e.target.closest('[data-k],[data-tick],[data-clear],[data-fr],[data-tp],[data-log],[data-del],[data-sync],[data-conn],[data-disc]');if(!t)return;
  var ta=$('notes');if(ta)S.notes=ta.value;
  if(t.dataset.k){var k=t.dataset.k,v=t.dataset.v;S[k]=(k==='bake')?v:+v}
  else if(t.dataset.tick){S.ticks[t.dataset.tick]=!S.ticks[t.dataset.tick]}
@@ -217,10 +218,11 @@ document.addEventListener('click',function(e){
  else if(t.dataset.log){document.querySelectorAll('[data-d]').forEach(function(i){DRAFT[i.dataset.d]=i.value});var D=defs(),v=function(k){return DRAFT[k]!=null?DRAFT[k]:D[k]},n=function(k){var x=parseFloat(v(k));return isNaN(x)?'':x};
  var st=v('st'),sh=v('sh'),bulk='';if(/^\d+:\d+$/.test(st)&&/^\d+:\d+$/.test(sh)){var a1=st.split(':'),b1=sh.split(':'),df=(+b1[0])*60+(+b1[1])-((+a1[0])*60+(+a1[1]));if(df<0)df+=1440;bulk=Math.round(df/6)/10}
  var ts=new Date(v('date')+'T'+(st||'12:00')).getTime();if(isNaN(ts))ts=Date.now();
- var nid=Date.now();LOG.unshift({id:nid,ts:ts,hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:n('fr'),temp:n('dt'),rm:n('rm'),st:st,sh:sh,bulk:bulk,rise:n('rise'),bf:n('bf'),ww:n('ww'),w:n('w'),lv:n('lv'),sa:n('sa'),pre:n('pre'),cov:n('cov'),cm:n('cm'),unc:n('unc'),um:n('um'),it:n('it'),rating:S.rating,photo:P?P.url:'',notes:S.notes.trim()});LOG.sort(function(a,b){return b.ts-a.ts});fbPut(LOG.filter(function(l){return l.id===nid})[0]);S.notes='';P=null;DRAFT={}}
- else if(t.dataset.del){fbDel(t.dataset.del);LOG=LOG.filter(function(l){return String(l.id)!==t.dataset.del})}
- else if(t.dataset.gin){signIn();return}
- else if(t.dataset.gout){signOutU();return}
+ LOG.unshift({id:Date.now(),ts:ts,hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:n('fr'),temp:n('dt'),rm:n('rm'),st:st,sh:sh,bulk:bulk,rise:n('rise'),bf:n('bf'),ww:n('ww'),w:n('w'),lv:n('lv'),sa:n('sa'),pre:n('pre'),cov:n('cov'),cm:n('cm'),unc:n('unc'),um:n('um'),it:n('it'),rating:S.rating,photo:P?P.id:'',notes:S.notes.trim()});LOG.sort(function(a,b){return b.ts-a.ts});S.notes='';P=null;DRAFT={}}
+ else if(t.dataset.del){DEL.push(+t.dataset.del);LOG=LOG.filter(function(l){return String(l.id)!==t.dataset.del})}
+ else if(t.dataset.sync){sync();return}
+ else if(t.dataset.conn){var u=$('gu').value.trim(),rp=$('gr').value.trim(),tk=$('gt').value.trim();if(!u||!rp||!tk){msg('Fill in all three boxes first.');return}CFG={owner:u,repo:rp,token:tk};try{localStorage.setItem('bb-gh',JSON.stringify(CFG))}catch(e){}render();sync();return}
+ else if(t.dataset.disc){CFG={};try{localStorage.removeItem('bb-gh')}catch(e){}msg('Disconnected. Your data stays on this device.');render();return}
  save();render();
 });
 document.addEventListener('change',function(e){
