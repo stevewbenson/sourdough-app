@@ -81,10 +81,11 @@ function $(id){return document.getElementById(id)}
 var P=null,syncing=false,stimer=null,DRAFT={};
 function p2(n){return (n<10?'0':'')+n}
 function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
+function mixDate(){var d=new Date(),back=(d.getDay()-((S.day+1)%7)+7)%7;d.setDate(d.getDate()-back);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
 function hm(m){m=((m%1440)+1440)%1440;return p2(Math.floor(m/60))+':'+p2(m%60)}
 function t12(x){var a=String(x).split(':'),h=+a[0],ap=h>=12?'PM':'AM';return (h%12||12)+':'+a[1]+' '+ap}
 function defs(){var c=compute(),g=guide(S.temp),h=S.mix.split(':'),mm=(+h[0])*60+(+h[1]);
- return {date:today(),st:S.mix,sh:hm(mm+Math.round(g.h*60)),fr:S.fridge,rise:'',bf:c.bf,ww:c.ww,w:c.w,lv:c.L,sa:c.sl,dt:S.temp,rm:'',pre:S.pre,cov:S.cov,unc:S.unc,cm:20,um:15,it:''}}
+ return {date:mixDate(),st:S.mix,sh:hm(mm+Math.round(g.h*60)),fr:S.fridge,rise:'',bf:c.bf,ww:c.ww,w:c.w,lv:c.L,sa:c.sl,dt:S.temp,rm:'',pre:S.pre,cov:S.cov,unc:S.unc,cm:20,um:15,it:''}}
 function logCard(){var D=defs();
  function f(k,lb,ty,ph){ty=ty||'number';var v=DRAFT[k]!=null?DRAFT[k]:D[k];return '<div><div class="lbl">'+lb+'</div><input data-d="'+k+'" type="'+ty+'"'+(ty==='number'?' inputmode="decimal" step="any"':'')+' value="'+esc(v)+'" placeholder="'+(ph||'')+'"></div>'}
  return '<div class="card"><h2>Loaf log</h2><div class="note" style="margin:-6px 0 8px">Pre-filled from your plan. Change anything to match what you actually did.</div>'
