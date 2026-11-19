@@ -78,7 +78,7 @@ function curSet(){var c={};for(var k in S)if(k!=='ticks'&&k!=='notes')c[k]=S[k];
 function persist(){try{localStorage.setItem('bb-sts',STS);localStorage.setItem('bb-del',JSON.stringify(DEL));localStorage.setItem('bakeboard-log',JSON.stringify(LOG));localStorage.setItem('bakeboard-set',JSON.stringify(curSet()))}catch(e){}}
 function save(){STS=Date.now();persist();sched()}
 function $(id){return document.getElementById(id)}
-var P=null,syncing=false,stimer=null,DRAFT={};
+var P=null,syncing=false,again=false,stimer=null,DRAFT={};
 function p2(n){return (n<10?'0':'')+n}
 function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
 function mixDate(){var d=new Date(),back=(d.getDay()-((S.day+1)%7)+7)%7;d.setDate(d.getDate()-back);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())}
@@ -94,8 +94,8 @@ function logCard(){var D=defs();
  +'<div class="sec">Temperatures (°F)</div><div class="g2">'+f('dt','Dough temp at mix')+f('rm','Room temp')+'</div>'
  +'<div class="sec">Bake</div><div class="g2">'+f('pre','Preheat °F')+f('it','Internal temp °F')+f('cov','Covered °F')+f('cm','Covered minutes')+f('unc','Uncovered °F')+f('um','Uncovered minutes')+'</div>'
  +'<div class="sec">How it went</div><div class="g2">'+f('rise','Perceived rise at shaping (%)','number','e.g. 40')+'</div><div class="lbl">Rating</div>'+chips([[1,'1★'],[2,'2★'],[3,'3★'],[4,'4★'],[5,'5★']],S.rating,'rating')
- +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(P?'<img src="'+P.url+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')
- +'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+S.notes.replace(/</g,'&lt;')+'</textarea><button class="btn" data-log="1">Log this bake</button>'
+ +(CFG.token?'<div class="lbl">Crumb photo</div><input type="file" accept="image/*" id="photo">'+(DRAFT.ph?'<img data-ph="'+esc(DRAFT.ph)+'" alt="" style="width:100%;border-radius:10px;margin-top:8px">':'')+'<div class="note" id="pst"></div>':'')
+ +'<div class="lbl">Notes (crumb, ear, crust, taste)</div><textarea id="notes" rows="3" placeholder="Open crumb, good ear, a bit pale…">'+esc(DRAFT.notes||'')+'</textarea><div class="note">Draft: fields save as you go and sync to your other devices. Tap Log this bake when the loaf is finished.</div><button class="btn" data-log="1">Log this bake</button><button class="btn s" data-cd="1" style="margin-top:6px">Clear draft</button>'
  +(LOG.length?LOG.map(loafHtml).join(''):'<div class="note" style="margin-top:12px">No loaves logged yet.</div>')+'</div>'}
 function loafHtml(l){var d=new Date(l.ts),q=function(a){return a.filter(Boolean).join(' · ')},has=function(x){return x!==''&&x!=null};
  var ln=[q([l.hyd+'% hydration',l.n+' loaves',l.bake,l.auto+' min autolyse']),
@@ -110,10 +110,11 @@ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp
 function gh(path,o){o=o||{};o.headers=Object.assign({Authorization:'Bearer '+CFG.token,Accept:'application/vnd.github+json'},o.headers||{});return fetch('https://api.github.com/repos/'+CFG.owner+'/'+CFG.repo+'/contents/'+path,o)}
 function b64(t){return btoa(unescape(encodeURIComponent(t)))}
 function unb64(t){return decodeURIComponent(escape(atob(t.replace(/\n/g,''))))}
+function busy(){var a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')}
 function msg(t){var e=$('sync');if(e)e.textContent=t}
 function sched(){clearTimeout(stimer);if(CFG.token)stimer=setTimeout(sync,1500)}
 async function sync(){
- if(!CFG.token||syncing)return;syncing=true;msg('Syncing…');
+ if(!CFG.token)return;if(syncing){again=true;return}syncing=true;msg('Syncing…');
  try{
   for(var tries=0;tries<3;tries++){
    var r=await gh('data.json',{cache:'no-store'}),sha=null,rem={log:[],del:[],set:null,sts:0};
@@ -138,12 +139,12 @@ async function sync(){
   msg('Synced '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}));
   var a=document.activeElement;if(!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')))render();
  }catch(e){msg((navigator.onLine?'':'Offline. ')+'Sync problem: '+e.message)}
- syncing=false}
-function upPhoto(f){if(!f||!CFG.token)return;var ta=$('notes');if(ta)S.notes=ta.value;var pst=$('pst');if(pst)pst.textContent='Uploading…';
+ syncing=false;if(again){again=false;sync()}}
+function upPhoto(f){if(!f||!CFG.token)return;var ta=$('notes');if(ta)DRAFT.notes=ta.value;var pst=$('pst');if(pst)pst.textContent='Uploading…';
  var im=new Image(),u=URL.createObjectURL(f);
  im.onload=function(){var r=Math.min(1,1000/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*r);c.height=Math.round(im.height*r);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
   var url=c.toDataURL('image/jpeg',.7),id=String(Date.now());
-  gh('photos/'+id+'.jpg',{method:'PUT',body:JSON.stringify({message:'photo',content:url.split(',')[1]})}).then(function(r){if(!r.ok)throw 0;P={id:id,url:url};try{fetch(url).then(function(x){return x.blob()}).then(function(bl){return caches.open('bb-ph').then(function(ch){return ch.put('ph-'+id,new Response(bl))})})}catch(e){}render()}).catch(function(){var p=$('pst');if(p)p.textContent='Upload failed. Are you online?'})};
+  gh('photos/'+id+'.jpg',{method:'PUT',body:JSON.stringify({message:'photo',content:url.split(',')[1]})}).then(function(r){if(!r.ok)throw 0;P={id:id,url:url};DRAFT.ph=id;save();try{fetch(url).then(function(x){return x.blob()}).then(function(bl){return caches.open('bb-ph').then(function(ch){return ch.put('ph-'+id,new Response(bl))})})}catch(e){}render()}).catch(function(){var p=$('pst');if(p)p.textContent='Upload failed. Are you online?'})};
  im.onerror=function(){var p=$('pst');if(p)p.textContent='Could not read that image'};im.src=u}
 async function getPhoto(id){var c=await caches.open('bb-ph'),k='ph-'+id,h=await c.match(k);if(!h){var r=await gh('photos/'+id+'.jpg',{headers:{Accept:'application/vnd.github.raw+json'}});if(!r.ok)throw 0;await c.put(k,r.clone());h=r}return URL.createObjectURL(await h.blob())}
 function loadPh(){document.querySelectorAll('img[data-ph]').forEach(function(im){if(im.getAttribute('src'))return;getPhoto(im.dataset.ph).then(function(u){im.src=u}).catch(function(){})})}
@@ -152,7 +153,7 @@ function syncCard(){var c='<div class="card"><h2>Sync</h2>';
  else c+='<div class="note">Keeps your loaf log and settings in sync across devices using a private GitHub repo.</div><div class="lbl">GitHub username</div><input id="gu" autocapitalize="none" autocorrect="off"><div class="lbl">Data repo name</div><input id="gr" value="sourdough-data" autocapitalize="none" autocorrect="off"><div class="lbl">Access token</div><input id="gt" type="password" autocomplete="off"><button class="btn" data-conn="1">Connect and sync</button>';
  return c+'</div>'}
 function init(){msg(CFG.token?'Syncing…':'Not connected. Scroll down to Sync to connect GitHub.');if(CFG.token)sync();
- document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});window.addEventListener('online',sync);
+ document.addEventListener('visibilitychange',function(){if(!document.hidden)sync()});window.addEventListener('online',sync);setInterval(function(){if(!document.hidden&&CFG.token&&!busy())sync()},30000);
  if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){})}
 function chips(arr,cur,key,fmt){return '<div class="row">'+arr.map(function(v){return '<button class="chip'+(v[0]===cur?' on':'')+'" data-k="'+key+'" data-v="'+v[0]+'">'+v[1]+'</button>'}).join('')+'</div>'}
 function fmtT(m,base){var d=Math.floor(m/1440),mm=((m%1440)+1440)%1440,h=Math.floor(mm/60),mi=mm%60,ap=h>=12?'PM':'AM';h=h%12||12;return {t:h+':'+(mi<10?'0':'')+mi+' '+ap,d:d!==base?DAYS[((d%7)+7)%7]:''}}
@@ -161,6 +162,7 @@ function guide(t){var c=Math.max(65,Math.min(80,t)),i=Math.min(14,Math.floor(c)-
 function compute(){var n=S.batch,F=S.fpl*n,ww=Math.round(F*S.ww/100),bf=F-ww,w=Math.round(F*S.hyd/100),L=Math.round(F*S.lev/100),sl=Math.round(F*S.salt/100);var tot=F+w+L+sl;
  var st=Math.round(L/9),fw=Math.round((L-st)/2);return {n:n,F:F,ww:ww,bf:bf,w:w,L:L,sl:sl,tot:tot,per:Math.round(tot/n),st:st,fw:fw}}
 function render(){
+ DRAFT=S.draft||(S.draft={});
  var c=compute(),h=S.mix.split(':'),mixM=(+h[0])*60+(+h[1]),g=guide(S.temp);
  $('eyebrow').textContent='Yeasty Boys · '+(100-S.ww)+'/'+S.ww+' flour · '+S.lev+'% levain · '+S.salt+'% salt';
  var ing=function(id,name,v){return '<div class="ing'+(S.ticks[id]?' done':'')+'" data-tick="'+id+'"><span class="dot"></span><span>'+name+'</span><b>'+v+' <small>g</small></b></div>'};
@@ -209,8 +211,8 @@ P2.forEach(function(p){if(/<h2>(The clock|Bake sheet)/.test(p))R+=p;else if(/<h2
 $('app').innerHTML='<div class="cols"><div>'+L+'</div><div>'+R+'</div></div>'+G+syncCard();loadPh();
 }
 document.addEventListener('click',function(e){
- var t=e.target.closest('[data-k],[data-tick],[data-clear],[data-fr],[data-tp],[data-log],[data-del],[data-sync],[data-conn],[data-disc]');if(!t)return;
- var ta=$('notes');if(ta)S.notes=ta.value;
+ var t=e.target.closest('[data-k],[data-tick],[data-clear],[data-fr],[data-tp],[data-log],[data-cd],[data-del],[data-sync],[data-conn],[data-disc]');if(!t)return;
+ var ta=$('notes');if(ta)DRAFT.notes=ta.value;
  if(t.dataset.k){var k=t.dataset.k,v=t.dataset.v;S[k]=(k==='bake')?v:+v}
  else if(t.dataset.tick){S.ticks[t.dataset.tick]=!S.ticks[t.dataset.tick]}
  else if(t.dataset.clear){S.ticks={}}
@@ -219,7 +221,8 @@ document.addEventListener('click',function(e){
  else if(t.dataset.log){document.querySelectorAll('[data-d]').forEach(function(i){DRAFT[i.dataset.d]=i.value});var D=defs(),v=function(k){return DRAFT[k]!=null?DRAFT[k]:D[k]},n=function(k){var x=parseFloat(v(k));return isNaN(x)?'':x};
  var st=v('st'),sh=v('sh'),bulk='';if(/^\d+:\d+$/.test(st)&&/^\d+:\d+$/.test(sh)){var a1=st.split(':'),b1=sh.split(':'),df=(+b1[0])*60+(+b1[1])-((+a1[0])*60+(+a1[1]));if(df<0)df+=1440;bulk=Math.round(df/6)/10}
  var ts=new Date(v('date')+'T'+(st||'12:00')).getTime();if(isNaN(ts))ts=Date.now();
- LOG.unshift({id:Date.now(),ts:ts,hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:n('fr'),temp:n('dt'),rm:n('rm'),st:st,sh:sh,bulk:bulk,rise:n('rise'),bf:n('bf'),ww:n('ww'),w:n('w'),lv:n('lv'),sa:n('sa'),pre:n('pre'),cov:n('cov'),cm:n('cm'),unc:n('unc'),um:n('um'),it:n('it'),rating:S.rating,photo:P?P.id:'',notes:S.notes.trim()});LOG.sort(function(a,b){return b.ts-a.ts});S.notes='';P=null;DRAFT={}}
+ LOG.unshift({id:Date.now(),ts:ts,hyd:S.hyd,n:S.batch,bake:S.bake==='pans'?'pans':'Dutch ovens',auto:S.auto,fridge:n('fr'),temp:n('dt'),rm:n('rm'),st:st,sh:sh,bulk:bulk,rise:n('rise'),bf:n('bf'),ww:n('ww'),w:n('w'),lv:n('lv'),sa:n('sa'),pre:n('pre'),cov:n('cov'),cm:n('cm'),unc:n('unc'),um:n('um'),it:n('it'),rating:S.rating,photo:DRAFT.ph||'',notes:(DRAFT.notes||'').trim()});LOG.sort(function(a,b){return b.ts-a.ts});P=null;S.draft={};DRAFT=S.draft}
+ else if(t.dataset.cd){P=null;S.draft={};DRAFT=S.draft}
  else if(t.dataset.del){DEL.push(+t.dataset.del);LOG=LOG.filter(function(l){return String(l.id)!==t.dataset.del})}
  else if(t.dataset.sync){sync();return}
  else if(t.dataset.conn){var u=$('gu').value.trim(),rp=$('gr').value.trim(),tk=$('gt').value.trim();if(!u||!rp||!tk){msg('Fill in all three boxes first.');return}CFG={owner:u,repo:rp,token:tk};try{localStorage.setItem('bb-gh',JSON.stringify(CFG))}catch(e){}render();sync();return}
@@ -228,16 +231,17 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('change',function(e){
  var t=e.target;
- if(t.dataset.d){DRAFT[t.dataset.d]=t.value;return}
+ if(t.id==='notes'){DRAFT.notes=t.value;save();return}
+ if(t.dataset.d){DRAFT[t.dataset.d]=t.value;save();return}
  if(t.id==='photo'){upPhoto(t.files&&t.files[0]);return}
  if(t.id==='mixt'&&t.value){S.mix=t.value}
  else if(t.id==='hyd'){S.hyd=+t.value}
  else if(t.dataset.n){var v=parseFloat(t.value);if(!isNaN(v)&&v>=0)S[t.dataset.n]=v}
  else return;
- var ta=$('notes');if(ta)S.notes=ta.value;
+ var ta=$('notes');if(ta)DRAFT.notes=ta.value;
  save();render();
 });
-document.addEventListener('input',function(e){if(e.target.id==='hyd'){var h=$('hydv');if(h)h.textContent=e.target.value+'%'}});
+document.addEventListener('input',function(e){if(e.target.id==='notes'){DRAFT.notes=e.target.value;save()}else if(e.target.dataset&&e.target.dataset.d){DRAFT[e.target.dataset.d]=e.target.value;save()}if(e.target.id==='hyd'){var h=$('hydv');if(h)h.textContent=e.target.value+'%'}});
 render();init();
 </script>
 </body>
